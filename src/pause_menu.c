@@ -26,9 +26,15 @@
 	POSSIBILITY OF SUCH DAMAGE.
 */
 #include "pause_menu.h"
+#include "game.h"
 
 #include <cdogs/draw/drawtools.h>
 #include <cdogs/font.h>
+
+static void BriefingMenuDraw(
+	const menu_t *menu, GraphicsDevice *g, const struct vec2i pos,
+	const struct vec2i size, const void *data);
+static int BriefingMenuInput(int cmd, void *data);
 
 void PauseMenuInit(
 	PauseMenu *pm, EventHandlers *handlers, GraphicsDevice *g,
@@ -42,6 +48,15 @@ void PauseMenuInit(
 	// this item will get auto selected when pressing escape
 	MenuAddSubmenu(pm->ms.root, MenuCreate("Resume", MENU_TYPE_QUIT));
 	MenuAddSubmenu(pm->ms.root, MenuCreateSeparator(""));
+  char *maybeBriefing = ((RunGameData*)(gfxChangeData))->m->missionData->Description;
+  if (maybeBriefing && strlen(maybeBriefing) > 0) {
+	  menu_t *briefingMenu = MenuCreate("Briefing", MENU_TYPE_CUSTOM);
+    briefingMenu->u.customData.displayFunc = BriefingMenuDraw;
+    briefingMenu->u.customData.inputFunc = BriefingMenuInput;
+    briefingMenu->u.customData.data = (void*)maybeBriefing;
+    MenuAddSubmenu(pm->ms.root, briefingMenu);
+	  MenuAddSubmenu(pm->ms.root, MenuCreateSeparator(""));
+  }
 	pm->oData.config = &gConfig;
 	pm->oData.gfxChangeCallback = gfxChangeCallback;
 	pm->oData.gfxChangeData = gfxChangeData;
@@ -205,4 +220,31 @@ void PauseMenuDraw(const PauseMenu *pm)
 bool PauseMenuIsShown(const PauseMenu *pm)
 {
 	return pm->pausingDevice != INPUT_DEVICE_UNSET || pm->controllerUnplugged;
+}
+
+static void BriefingMenuDraw(
+	const menu_t *menu, GraphicsDevice *g, const struct vec2i pos,
+	const struct vec2i size, const void *data) {
+  (void)menu;(void)g;(void)pos;
+
+	const int w = size.x;
+	const int h = size.y;
+  const int y = h / 4;
+  const char *description = (const char*)data;
+
+	// allow some slack for newlines
+	char *buf;
+  CMALLOC(buf, strlen(description) * 2);
+  // Pad about 1/6th of the screen width total (1/12th left and right)
+  FontSplitLines(description, buf, w * 5 / 6);
+  FontStr(buf, svec2i(w / 12, y));
+  CFREE(buf);
+}
+
+static int BriefingMenuInput(int cmd, void *data) {
+  (void)data;
+  if (cmd == CMD_BUTTON1 || cmd == CMD_BUTTON2) {
+    return 1;
+  }
+  return 0;
 }
